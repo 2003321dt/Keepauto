@@ -13,6 +13,7 @@
 import os
 import re
 import sys
+import time
 import logging
 from datetime import datetime, timezone, timedelta
 import requests
@@ -118,26 +119,26 @@ def do_login(session: requests.Session, username: str, password: str) -> bool:
 
 def do_signin(session: requests.Session) -> tuple:
     """
-    执行签到，返回 (是否本次新签到, 状态描述)
+    执行签到，返回 (签到状态有效, 是否本次新签到, 状态描述)
     接口在「今天已签到」时也返回 success:false，需按 message 区分。
     """
     try:
         data = get_json(session.post(f"{BASE_URL}/api/user/signin", json={}, timeout=25))
         if not data:
-            return False, "签到接口异常"
+            return False, False, "签到接口异常"
 
         msg = data.get("message", "")
         if data.get("success"):
             log.info("🎉 签到成功，额度已到账")
-            return True, "签到成功，额度已到账"
+            return True, True, "签到成功，额度已到账"
         if "已经签到" in msg or "已签到" in msg:
             log.info("✅ 今日已签到")
-            return False, "今日已签到"
+            return True, False, "今日已签到"
         log.warning("签到失败: %s", msg)
-        return False, f"签到失败：{msg or '未知错误'}"
+        return False, False, f"签到失败：{msg or '未知错误'}"
     except requests.RequestException as e:
         log.error("签到请求异常: %s", e)
-        return False, "签到请求异常"
+        return False, False, "签到请求异常"
 
 def get_user_info(session: requests.Session) -> dict:
     """获取用户信息（含 quota / permanentQuota / dailyQuota / isVip）"""
@@ -177,15 +178,17 @@ def process_account(username: str, password: str) -> dict:
         result["status"] = "登录失败"
         return result
 
-    result["new_signin"], result["status"] = do_signin(session)
+    signin_ok, result["new_signin"], result["status"] = do_signin(session)
+    if not signin_ok:
+        return result
+    result["success"] = True
 
-    # 签到后查询最新额度
+    # 签到成功或今日已签到后再查询额度
     info = get_user_info(session)
     if not info:
         result["status"] += "（额度查询失败）"
         return result
 
-    result["success"] = True
     result["username"] = mask(info.get("username") or username)
     result["quota"] = info.get("quota", 0)
     result["permanent_quota"] = info.get("permanentQuota", 0)
