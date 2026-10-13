@@ -4,7 +4,7 @@
 
 ## 功能
 
-- ✅ 每日自动登录 + 签到（北京时间 00:05，GitHub Actions 定时）
+- ✅ 每日自动登录 + 签到（北京时间 08:00，GitHub Actions 定时）
 - ✅ 支持多账号，TG 汇总一条通知
 - ✅ 每次运行重新登录，无需 Cookie 持久化
 - ✅ 签到后查询最新额度（总额 / 永久 / 每日）
@@ -13,7 +13,7 @@
 ## 目录结构
 
 ```
-xiaoenai-ckin/
+xiaoenai-checkin/
 ├── checkin.py        # 主流程：登录 → 签到 → 查额度 → 汇总
 ├── notify.py         # Telegram 通知组件
 ├── requirements.txt
@@ -25,7 +25,7 @@ xiaoenai-ckin/
 
 ## GitHub Secrets 配置
 
-在仓库 Settings → Secrets and variables → Actions 中配置：
+在 Fork 仓库 Settings → Secrets and variables → Actions → Repository secrets → New repository secret 中配置。请勿将邮箱密码放入 Variables 或提交到代码中：
 
 | Secret | 说明 |
 |--------|------|
@@ -45,7 +45,7 @@ user2@qq.com:password2
 ## 本地调试
 
 ```bash
-cd xiaoenai-ckin
+cd xiaoenai-checkin
 pip install -r requirements.txt
 
 # Linux/macOS
@@ -84,5 +84,7 @@ python checkin.py
 
 ## 定时说明
 
-- 默认北京时间每日 00:05 运行（cron `5 16 * * *` UTC）
-- 可在 GitHub Actions 页面手动触发 `肖恩AI 每日签到` workflow
+- 默认北京时间每日 08:00 运行（cron `0 0 * * *` UTC；GitHub 定时任务可能有延迟）
+- 首次 Fork 后可能需要在 Actions 页面启用工作流。
+- 填写 `XIAOENAI_ACCOUNTS` Secret 后，可在 GitHub Actions 页面手动触发 `肖恩AI 每日签到` workflow。
+- 未提供登录凭证前运行会失败；账号密码仅存于 GitHub Secrets，永远不要写进 workflow 的明文或仓库文件。
