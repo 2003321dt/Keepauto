@@ -15,19 +15,19 @@
 
 在 GitHub Actions 的 **Settings → Secrets and variables → Actions** 中设置：
 
-#### Variables（公开变量）
-
-| 变量名 | 说明 | 是否必需 |
-|--------|------|----------|
-| `API456_ACCOUNTS` | 账号列表，格式 `user1:pass1,user2:pass2`，支持换行或逗号分隔 | **是** |
-| `API456_BASE_URL` | 站地址，默认 `https://api456.me` | 可选 |
-
 #### Secrets（机密变量）
 
 | 变量名 | 说明 | 是否必需 |
 |--------|------|----------|
+| `API456_ACCOUNTS` | 账号列表，格式 `user1:pass1,user2:pass2`，支持换行或逗号分隔 | **是** |
 | `TG_BOT_TOKEN` | Telegram Bot Token | 可选 |
 | `TG_CHAT_ID` | Telegram Chat ID | 可选 |
+
+#### Variables（非敏感信息）
+
+| 变量名 | 说明 | 是否必需 |
+|--------|------|----------|
+| `API456_BASE_URL` | 站地址，默认 `https://api456.me` | 可选 |
 
 ### 2. 账号格式
 
@@ -37,7 +37,7 @@
 user1:pass1,user2:pass2
 ```
 
-或换行分隔（在 GitHub Variables 中换行输入）：
+或换行分隔（在 GitHub Secrets 中换行输入）：
 
 ```
 user1:pass1
