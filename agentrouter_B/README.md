@@ -23,8 +23,9 @@
 
 | Name | Value | 说明 |
 |------|-------|------|
-| `USERNAME` | 你的邮箱 | AgentRouter 登录邮箱 |
-| `PASSWORD` | 你的密码 | AgentRouter 登录密码 |
+| `AGENTROUTER_USERNAME` | 你的邮箱 | AgentRouter 登录邮箱 |
+| `AGENTROUTER_PASSWORD` | 你的密码 | AgentRouter 登录密码 |
+| `NODE_LINK` | 节点链接或订阅 URL（可选） | 单个代理节点链接或订阅地址，配置后优先于 `PROXY_CONFIG_URL` |
 | `PROXY_CONFIG_URL` | 订阅地址 URL | 代理订阅地址（返回 base64 或明文的节点列表） |
 
 > **代理配置说明**：`PROXY_CONFIG_URL` 填代理订阅地址，脚本会自动拉取、解码并**逐节点测试连通性，自动选择第一个可用节点**。
