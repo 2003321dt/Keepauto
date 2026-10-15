@@ -28,7 +28,7 @@ jobs:
       - name: ✅ 执行签到
         working-directory: ./api456
         env:
-          API456_ACCOUNTS: ${{ vars.API456_ACCOUNTS }}
+          API456_ACCOUNTS: ${{ secrets.API456_ACCOUNTS }}
           API456_BASE_URL: ${{ vars.API456_BASE_URL }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
