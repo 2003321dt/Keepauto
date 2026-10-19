@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
-BASE_URL = os.getenv("R9_BASE_URL") or "https://9router.jiu.qzz.io"
+BASE_URL = os.getenv("R9_BASE_URL") or ""
 PASSWORD = os.getenv("R9_PASSWORD") or ""
 OUTPUT_FILE = "socks5-otc.txt"       # 最终可用节点输出
 NODES_FILE = "socks5.txt"            # tg-fetch.py 产物
