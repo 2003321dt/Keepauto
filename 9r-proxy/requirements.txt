@@ -1,2 +1,4 @@
-﻿requests>=2.31
-beautifulsoup4>=4.12
+requests>=2.31
+
+# 可选：仅当使用旧版 tg-fetch.py（Telethon 方案）时才需要
+# telethon>=1.36
