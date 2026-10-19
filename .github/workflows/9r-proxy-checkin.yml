@@ -2,8 +2,8 @@ name: 9R-Proxy 代理同步
 
 on:
   schedule:
-    # 北京时间 9:00 = UTC 1:00
-    - cron: "50 0 * * *"
+    # 北京时间 18:00 = UTC 10:00
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 jobs:
@@ -28,16 +28,17 @@ jobs:
       - name: 📦 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 📡 抓取 TG 节点（免 API，t.me/s 网页版）
+      - name: 📡 抓取 TG 节点（公开频道，无需 API 凭据）
         id: fetch
         env:
-          CHANNEL: ${{ vars.TG_CHANNEL }}
-          FETCH_DAYS: ${{ vars.FETCH_DAYS }}
-        run: python tg-fetch.py
+          TG_CHANNELS: ${{ vars.TG_CHANNELS || 'otcfxq' }}
+          FETCH_DAYS: ${{ vars.FETCH_DAYS || '3' }}
+          MAX_PAGES: ${{ vars.MAX_PAGES || '30' }}
+          PAGE_DELAY: ${{ vars.PAGE_DELAY || '2' }}
+        run: python tg-fetch-web.py
 
       - name: 🔄 同步 9router 代理池
         id: sync
-        if: steps.fetch.outputs.has_nodes == 'true'
         env:
           R9_BASE_URL: ${{ vars.R9_BASE_URL }}
           R9_PASSWORD: ${{ secrets.R9_PASSWORD }}
@@ -45,16 +46,8 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python proxy-manager.py
 
-      # 未抓取到节点时：跳过同步、提交，仅发送 TG 通知
-      - name: 📭 TG 通知：未抓取到节点
-        if: steps.fetch.outputs.has_nodes == 'false'
-        env:
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python send-unavailable-notify.py
-
       - name: 📄 提交 socks5-otc.txt
-        if: steps.fetch.outputs.has_nodes == 'true'
+        if: always()
         working-directory: .   # 覆盖默认，回到仓库根目录
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
