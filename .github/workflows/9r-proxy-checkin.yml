@@ -28,14 +28,11 @@ jobs:
       - name: 📦 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 📡 抓取 TG 节点（公开频道，无需 API 凭据）
+      - name: 📡 抓取节点（上游已筛选节点文件）
         id: fetch
         env:
-          TG_CHANNELS: ${{ vars.TG_CHANNELS || 'otcfxq' }}
-          FETCH_DAYS: ${{ vars.FETCH_DAYS || '3' }}
-          MAX_PAGES: ${{ vars.MAX_PAGES || '30' }}
-          PAGE_DELAY: ${{ vars.PAGE_DELAY || '2' }}
-        run: python tg-fetch-web.py
+          GH_NODE_URLS: ${{ vars.GH_NODE_URLS || 'https://raw.githubusercontent.com/yutian81/Keepalive/refs/heads/main/9r-proxy/socks5-otc.txt' }}
+        run: python fetch-nodes.py
 
       - name: 🔄 同步 9router 代理池
         id: sync
