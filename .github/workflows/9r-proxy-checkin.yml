@@ -2,7 +2,7 @@ name: 9R-Proxy 代理同步
 
 on:
   schedule:
-    # 北京时间 22:00 = UTC 14:00
+    # 北京时间 18:00 = UTC 10:00
     - cron: "0 14 * * *"
   workflow_dispatch:
 
@@ -28,10 +28,11 @@ jobs:
       - name: 📦 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 📡 抓取节点（上游已筛选节点文件）
+      - name: 📡 抓取节点（上游节点文件）
         id: fetch
         env:
           GH_NODE_URLS: ${{ vars.GH_NODE_URLS || 'https://raw.githubusercontent.com/yutian81/Keepalive/refs/heads/main/9r-proxy/socks5-otc.txt' }}
+          GH_TIMEOUT: ${{ vars.GH_TIMEOUT || '25' }}
         run: python fetch-nodes.py
 
       - name: 🔄 同步 9router 代理池
