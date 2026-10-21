@@ -1,59 +1,49 @@
 #!/usr/bin/env python3
 """
-节点抓取脚本（上游节点文件版，无任何 API 凭据）
+上游节点文件抓取脚本（GitHub Actions 专用）
 
 不再直连 Telegram，改为直接读取上游仓库已筛选好的节点文件：
   https://raw.githubusercontent.com/yutian81/Keepalive/refs/heads/main/9r-proxy/socks5-otc.txt
 
-上游作者的节点本身就是他从 TG 频道抓取并筛选过的，所以这里只做：
-  1. 拉取 txt
-  2. 正则提取 socks5/http 节点
-  3. 以 ip:port 去重
-  4. 输出到 socks5.txt（供 proxy-manager.py 上传到 9router）
+上游那份 socks5-otc.txt 本身就是原作者从 TG 频道抓取、并经过连通性测试筛选后的
+结果，所以本地不必再登录 TG，也就不需要任何 API 凭据。
+
+流程：
+1. 下载节点 txt
+2. 正则提取 socks5/http 节点
+3. 以 ip:port 去重
+4. 输出到 socks5.txt（供 proxy-manager.py 上传 9router）
 
 需要的配置（环境变量）：
-  GH_NODE_URLS   节点文件地址列表，逗号分隔（支持 github.com/.../blob/... 自动转 raw）
-  FETCH_PLAIN    1 = 同时收录无认证的 ip:port 形式，默认 0
-  GH_TIMEOUT     单次请求超时秒数，默认 25
-  OUTPUT_FILE    输出文件名，默认 socks5.txt
+  GH_NODE_URLS   节点文件地址，多个用逗号分隔，默认上游 socks5-otc.txt
+  GH_TIMEOUT     单次下载超时秒数，默认 25
 """
 
 import os
 import re
 import sys
 import logging
+
 import requests
 
 # ================= 配置区域 =================
-
-DEFAULT_GH_URLS = [
-    "https://raw.githubusercontent.com/yutian81/Keepalive/refs/heads/main/9r-proxy/socks5-otc.txt",
-]
-
+DEFAULT_URL = (
+    "https://raw.githubusercontent.com/yutian81/Keepalive/refs/heads/main/"
+    "9r-proxy/socks5-otc.txt"
+)
 GH_NODE_URLS = [
     u.strip()
-    for u in (os.getenv("GH_NODE_URLS") or ",".join(DEFAULT_GH_URLS)).split(",")
+    for u in (os.getenv("GH_NODE_URLS") or DEFAULT_URL).split(",")
     if u.strip()
 ]
-
 GH_TIMEOUT = int(os.getenv("GH_TIMEOUT") or "25")
-FETCH_PLAIN = os.getenv("FETCH_PLAIN") == "1"
-OUTPUT_FILE = os.getenv("OUTPUT_FILE") or "socks5.txt"
-
+OUTPUT_FILE = "socks5.txt"
 # ============================================
 
-# 带认证的节点：socks5://user:pass@ip:port
+# 匹配 socks5/http/https 节点 URL（user:pass@ip:port）
+# [^\s#@]+ 在 # 前停止 → match.group(0) 即纯净 URL（不含 #标签）
 NODE_RE = re.compile(
     r"(socks5|http|https)://[^\s#@]+@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)"
-)
-# 无认证的节点：socks5://ip:port（可选启用）
-NODE_PLAIN_RE = re.compile(
-    r"(socks5|http|https)://(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)"
-)
-
-UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
 logging.basicConfig(
@@ -64,12 +54,6 @@ logging.basicConfig(
 log = logging.getLogger("fetch-nodes")
 
 
-def make_session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({"User-Agent": UA})
-    return s
-
-
 def normalize_url(url: str) -> str:
     """把 github.com/.../blob/... 网页地址转成 raw 直链"""
     if "github.com" in url and "/blob/" in url:
@@ -77,75 +61,65 @@ def normalize_url(url: str) -> str:
     return url
 
 
-def node_key(url: str) -> str:
-    """以 ip:port 作为去重键"""
-    m = NODE_RE.match(url) or NODE_PLAIN_RE.match(url)
-    return f"{m.group(2)}:{m.group(3)}" if m else url
-
-
 def extract_nodes(text: str) -> list:
-    nodes = [m.group(0) for m in NODE_RE.finditer(text)]
-    if FETCH_PLAIN:
-        nodes += [m.group(0) for m in NODE_PLAIN_RE.finditer(text)]
-    return nodes
+    """从文件文本中提取纯净节点 URL 列表（去重由调用方完成）"""
+    return [m.group(0) for m in NODE_RE.finditer(text)]
 
 
-def fetch_file(session: requests.Session, url: str, seen: dict) -> int:
-    """抓取单个节点文件，写入 seen，返回本次新增数"""
+def fetch_file(session: requests.Session, url: str, seen: dict) -> None:
+    """下载单个节点文件，把节点写入 seen（以 ip:port 为 key）"""
     target = normalize_url(url)
     try:
         resp = session.get(target, timeout=GH_TIMEOUT)
     except requests.RequestException as e:
-        log.error("请求异常 %s: %s", target, e)
-        return 0
+        log.error("下载异常 %s: %s", target, e)
+        return
 
     if resp.status_code != 200:
-        log.error("HTTP %d: %s", resp.status_code, target)
-        return 0
+        log.error("下载失败 HTTP %d: %s", target, resp.status_code)
+        return
 
     text = resp.text
-    # 防御：误传网页地址时会拿到 HTML
+    # 防御：误传网页地址会拿到 HTML
     if text.lstrip()[:15].lower().startswith(("<!doctype", "<html")):
         log.error("返回的是 HTML 而非纯文本，请使用 raw 地址: %s", target)
-        return 0
+        return
 
-    lines = [l for l in text.splitlines() if l.strip()]
-    added = 0
+    before = len(seen)
     for node in extract_nodes(text):
-        key = node_key(node)
-        if key not in seen:
-            seen[key] = node
-            added += 1
+        ip_port = NODE_RE.match(node)
+        key = f"{ip_port.group(2)}:{ip_port.group(3)}" if ip_port else node
+        seen.setdefault(key, node)
 
-    log.info("%s: 文件 %d 行, 当前累计 %d 个唯一节点（本次新增 %d）",
-             target.rsplit("/", 1)[-1], len(lines), len(seen), added)
-    return added
+    lines = len([l for l in text.splitlines() if l.strip()])
+    log.info("%s 文件 %d 行，新增 %d 个节点", target.rsplit("/", 1)[-1], lines, len(seen) - before)
 
 
 def main():
-    log.info("=" * 52)
-    log.info("节点抓取启动（上游节点文件，无 API 凭据）")
+    log.info("=" * 48)
+    log.info("节点抓取启动（上游节点文件）")
     log.info("数据源: %d 个", len(GH_NODE_URLS))
-    log.info("模式  : %s", "含无认证节点" if FETCH_PLAIN else "仅含认证节点")
 
-    session = make_session()
+    session = requests.Session()
+    session.headers.update(
+        {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    )
+
     seen = {}
     for url in GH_NODE_URLS:
-        log.info("-" * 52)
         fetch_file(session, url, seen)
 
-    log.info("-" * 52)
-    log.info("去重后总计: %d 个节点", len(seen))
+    log.info("提取节点数: %d", len(seen))
 
-    if not seen:
-        log.error("未取到任何节点，判定为失败")
-        sys.exit(1)
-
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    # newline="\n" 固定 LF，避免 Windows 下写出 CRLF 污染仓库
+    with open(OUTPUT_FILE, "w", encoding="utf-8", newline="\n") as f:
         for node in seen.values():
             f.write(node + "\n")
-    log.info("已写入 %s", OUTPUT_FILE)
-    log.info("=" * 52)
+
+    log.info("已写入 %s (%d 个节点)", OUTPUT_FILE, len(seen))
+    log.info("=" * 48)
+    if not seen:
+        sys.exit(1)  # 未抓取到节点，判定为失败
 
 
 if __name__ == "__main__":
