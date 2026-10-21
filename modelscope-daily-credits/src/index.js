@@ -86,10 +86,19 @@ async function main() {
   };
 
   try {
+    // 代理：优先用工作流产出的 PROXY_HTTP（sing-box 的 http 入站，Chromium 最稳），
+    // 其次 PROXY_SERVER（socks5）。两者都没有就直连。
+    const proxyServer = (process.env.PROXY_HTTP || process.env.PROXY_SERVER || '').trim();
+    if (proxyServer) log('浏览器将走代理：', proxyServer);
+    else log('未配置代理，浏览器直连');
+
+    const proxyOption = proxyServer ? { proxy: { server: proxyServer } } : {};
+
     browser = await chromium.launch({
       headless,
       // 可选：BROWSER_CHANNEL=chrome 使用本机已安装的 Chrome（本地调试更真实）
       ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}),
+      ...proxyOption,
       args: [
         '--no-sandbox',
         '--disable-dev-shm-usage',
@@ -104,6 +113,7 @@ async function main() {
       timezoneId: 'Asia/Shanghai',
       userAgent: UA,
       extraHTTPHeaders: { 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8' },
+      ...proxyOption, // 这样 context.request（登录态检测、余额接口）也走代理
     };
 
     // 复用上次运行留下的登录态，能显著降低触发滑块的概率
