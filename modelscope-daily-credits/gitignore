@@ -1,0 +1,10 @@
+# 依赖与运行产物
+node_modules/
+artifacts/
+session/
+.env
+.env.local
+
+# 系统文件
+.DS_Store
+Thumbs.db

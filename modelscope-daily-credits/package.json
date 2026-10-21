@@ -1,0 +1,19 @@
+{
+  "name": "modelscope-daily-credits",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub Actions 自动登录 ModelScope（魔搭），等待 10 秒后刷新页面并读取魔粒（积分）余额",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "login-only": "node src/index.js --login-only",
+    "smoke": "node scripts/smoke-login.js",
+    "check": "node --check src/index.js && node --check src/login.js && node --check src/balance.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
