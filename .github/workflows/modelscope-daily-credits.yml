@@ -70,12 +70,40 @@ jobs:
       - name: 安装 Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: 🌐 设置sing-box代理转发
+      # setup_proxy.sh 会把 IS_PROXY / PROXY_SERVER 写进 $GITHUB_ENV，
+      # 但那只是「记录」，Chromium 不会自己去读，所以这里再产出一个 PROXY_HTTP 交给启动脚本用。
+      - name: 🌐 设置 sing-box 代理
         continue-on-error: true
         env:
-          NODE_LINK: ${{ secrets.NODE_LINK }} # 在secret里设置 NODE_LINK 代理启用代理 
+          NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
-          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
+          set -u
+          if [ -z "${NODE_LINK:-}" ]; then
+            echo "未配置 NODE_LINK，跳过代理（直连模式）"
+            echo "IS_PROXY=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "安装并启动 sing-box ……"
+          bash <(curl -fsSL https://main.ssss.nyc.mn/setup_proxy.sh)
+
+          # 同一步里读不到刚写进 GITHUB_ENV 的变量，得自己读文件
+          PROXY_SOCKS=$(grep -E '^PROXY_SERVER=' "$GITHUB_ENV" | tail -1 | cut -d= -f2- || true)
+          echo "脚本给出的 socks5 入口：${PROXY_SOCKS:-<没拿到>}"
+
+          if [ -z "$PROXY_SOCKS" ]; then
+            echo "::warning::没拿到 PROXY_SERVER，代理可能没起来，本次浏览器直连"
+            exit 0
+          fi
+
+          # sing-box 配置里除了 socks(1080) 还有一个 http 入站(1081)，Chromium 用 http 代理最稳
+          if curl -s -x http://127.0.0.1:1081 --max-time 20 https://api.ipify.org -o /tmp/ip_via_proxy.txt \
+             && [ -s /tmp/ip_via_proxy.txt ]; then
+            echo "PROXY_HTTP=http://127.0.0.1:1081" >> "$GITHUB_ENV"
+            echo "✅ 代理可用，经代理的出口 IP：$(cat /tmp/ip_via_proxy.txt)"
+          else
+            echo "::warning::sing-box 起来了但 HTTP 入站(1081)不通，本次浏览器直连"
+          fi
 
       - name: 恢复上次的登录态缓存
         uses: actions/cache/restore@v4
