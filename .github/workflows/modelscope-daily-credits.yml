@@ -83,8 +83,8 @@ jobs:
           MODELSCOPE_USERNAME: ${{ secrets.MODELSCOPE_USERNAME }}
           MODELSCOPE_PASSWORD: ${{ secrets.MODELSCOPE_PASSWORD }}
           MODELSCOPE_COOKIE: ${{ secrets.MODELSCOPE_COOKIE }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: node src/index.js
 
       - name: 保存登录态缓存
