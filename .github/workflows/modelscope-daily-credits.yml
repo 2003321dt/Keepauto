@@ -70,6 +70,13 @@ jobs:
       - name: 安装 Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: 🌐 设置sing-box代理转发
+        continue-on-error: true
+        env:
+          NODE_LINK: ${{ secrets.NODE_LINK }} # 在secret里设置 NODE_LINK 代理启用代理 
+        run: |
+          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
+
       - name: 恢复上次的登录态缓存
         uses: actions/cache/restore@v4
         with:
