@@ -1,0 +1,104 @@
+name: ModelScope 每日登录领魔粒
+
+# 仓库结构说明：
+#   仓库根目录
+#   └── modelscope-daily-credits/     ← 真正的项目目录（package.json / src / 脚本都在这里）
+#       ├── src/
+#       ├── scripts/
+#       └── package.json
+# 因此下面所有 run 步骤统一指定 working-directory，
+# cache / artifact 的 path 相对「仓库根目录」写。
+
+on:
+  # 每天 00:10 UTC = 北京时间 08:10（魔粒每天 00:00 北京时间重置）
+  schedule:
+    - cron: "10 0 * * *"
+  # 支持手动点一下就跑
+  workflow_dispatch:
+    inputs:
+      wait_seconds:
+        description: "登录成功后等待多少秒再刷新页面"
+        required: false
+        default: "10"
+      headless:
+        description: "是否无头运行（true/false）"
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modelscope-daily-credits
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
+  # 项目子目录（改了目录名的话，这里和下面的 cache/artifact 路径一起改）
+  PROJECT_DIR: modelscope-daily-credits
+  WAIT_SECONDS: ${{ github.event.inputs.wait_seconds || '10' }}
+  HEADLESS: ${{ github.event.inputs.headless || 'true' }}
+  LOGIN_TIMEOUT_SECONDS: "90"
+
+defaults:
+  run:
+    working-directory: modelscope-daily-credits
+
+jobs:
+  claim:
+    name: 登录并查询魔粒余额
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 校验项目目录
+        run: |
+          echo "当前目录：$(pwd)"
+          ls -la
+          test -f package.json || { echo "::error::找不到 package.json，请检查 PROJECT_DIR 是否正确"; exit 1; }
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+
+      - name: 安装 Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 恢复上次的登录态缓存
+        uses: actions/cache/restore@v4
+        with:
+          path: modelscope-daily-credits/session
+          key: modelscope-session-${{ github.run_id }}
+          restore-keys: |
+            modelscope-session-
+
+      - name: 登录 → 等 10 秒 → 刷新 → 查积分
+        env:
+          MODELSCOPE_USERNAME: ${{ secrets.MODELSCOPE_USERNAME }}
+          MODELSCOPE_PASSWORD: ${{ secrets.MODELSCOPE_PASSWORD }}
+          MODELSCOPE_COOKIE: ${{ secrets.MODELSCOPE_COOKIE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node src/index.js
+
+      - name: 保存登录态缓存
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: modelscope-daily-credits/session
+          key: modelscope-session-${{ github.run_id }}
+
+      - name: 上传截图与日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelscope-run-${{ github.run_id }}
+          path: modelscope-daily-credits/artifacts
+          if-no-files-found: ignore
+          retention-days: 14
