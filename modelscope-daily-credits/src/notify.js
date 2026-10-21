@@ -1,8 +1,8 @@
 /**
  * 通知：Telegram Bot 推送
  *
- * 必填：TELEGRAM_BOT_TOKEN（@BotFather 创建的机器人 token）
- *       TELEGRAM_CHAT_ID  （你的 user id、群组/频道 id，如 123456789、-1001234567890、@channelname）
+ * 必填：TG_BOT_TOKEN（@BotFather 创建的机器人 token）
+ *       TG_CHAT_ID  （你的 user id、群组/频道 id，如 123456789、-1001234567890、@channelname）
  * 选填：TELEGRAM_API_BASE（默认 https://api.telegram.org，可填反代地址）
  *
  * 两个必填项缺任意一个就静默跳过，不影响主流程。
@@ -12,11 +12,11 @@ const { log, logError } = require('./utils');
 const MAX_LEN = 3800; // Telegram 单条上限 4096，留点余量
 
 async function notify(text) {
-  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+  const token = (process.env.TG_BOT_TOKEN || '').trim();
+  const chatId = (process.env.TG_CHAT_ID || '').trim();
 
   if (!token || !chatId) {
-    log('未配置 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID，跳过 Telegram 通知');
+    log('未配置 TG_BOT_TOKEN / TG_CHAT_ID，跳过 Telegram 通知');
     return false;
   }
 

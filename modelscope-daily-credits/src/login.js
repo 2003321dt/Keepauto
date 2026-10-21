@@ -276,18 +276,27 @@ async function loginWithPassword(context, page, { username, password, timeoutMs 
   return me;
 }
 
-/** Cookie 注入登录（兜底） */
-async function loginWithCookie(context, cookieString) {
-  if (!cookieString || !cookieString.trim()) {
-    throw new LoginError('未提供 MODELSCOPE_COOKIE', 'NO_COOKIE');
-  }
-  const cookies = cookieString
+/**
+ * 解析 Cookie 字符串，容错处理用户常见的粘贴姿势：
+ *   - 多带了前缀 "Cookie: "
+ *   - 前后带引号
+ *   - 一条 cookie 占一行（从 Network 面板 copy 成多行的情况）
+ * 返回 Playwright 可用的 cookie 数组。
+ */
+function parseCookieString(cookieString) {
+  const normalized = String(cookieString)
+    .replace(/^\s*cookie\s*:/i, '') // 去掉 "Cookie:" 前缀
+    .replace(/^\s*["']|["']\s*$/g, '') // 去掉首尾引号
+    .replace(/\r?\n/g, '; ') // 多行压成一行
+    .trim();
+
+  return normalized
     .split(';')
     .map((s) => s.trim())
     .filter(Boolean)
     .map((pair) => {
       const idx = pair.indexOf('=');
-      if (idx === -1) return null;
+      if (idx <= 0) return null; // 没有等号，或 name 为空
       return {
         name: pair.slice(0, idx).trim(),
         value: pair.slice(idx + 1).trim(),
@@ -298,8 +307,21 @@ async function loginWithCookie(context, cookieString) {
       };
     })
     .filter(Boolean);
+}
 
+/** Cookie 注入登录（兜底） */
+async function loginWithCookie(context, cookieString) {
+  if (!cookieString || !cookieString.trim()) {
+    throw new LoginError('未提供 MODELSCOPE_COOKIE', 'NO_COOKIE');
+  }
+
+  const cookies = parseCookieString(cookieString);
   if (!cookies.length) throw new LoginError('MODELSCOPE_COOKIE 解析结果为空', 'NO_COOKIE');
+
+  // m_session_id 才是登录态本体，缺了基本不可能成功，提前给出明确提示
+  if (!cookies.some((c) => c.name === 'm_session_id')) {
+    log('警告：Cookie 里没有 m_session_id，大概率不是登录态，登录可能失败');
+  }
 
   log(`注入 ${cookies.length} 条 Cookie`);
   await context.addCookies(cookies);
@@ -322,6 +344,7 @@ module.exports = {
   loginWithPassword,
   loginWithCookie,
   waitForLogin,
+  parseCookieString,
   // 以下导出供冒烟测试复用
   findFormFrame,
   firstVisible,

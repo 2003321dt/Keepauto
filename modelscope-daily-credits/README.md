@@ -53,16 +53,53 @@ git push -u origin main
 | --- | --- | --- |
 | `MODELSCOPE_USERNAME` | 必填 | 魔搭账号（手机号 / 邮箱 / 用户名，就是网页登录框里填的那个） |
 | `MODELSCOPE_PASSWORD` | 必填 | 密码 |
-| `MODELSCOPE_COOKIE` | 选填 | 兜底用。复制浏览器里 modelscope.cn 的 Cookie 字符串，账号密码被滑块拦住时启用 |
-| `TELEGRAM_BOT_TOKEN` | 选填 | Telegram 机器人 token，填了才会推送 |
-| `TELEGRAM_CHAT_ID` | 选填 | 接收消息的 chat id（自己 / 群 / 频道） |
+| `MODELSCOPE_COOKIE` | 选填 | 兜底用。浏览器里整段 Cookie 字符串，账号密码被滑块拦住时启用。取法见下 |
+| `TG_BOT_TOKEN` | 选填 | Telegram 机器人 token，填了才会推送 |
+| `TG_CHAT_ID` | 选填 | 接收消息的 chat id（自己 / 群 / 频道） |
+
+#### 怎么拿 MODELSCOPE_COOKIE
+
+真正代表「已登录」的是 **`m_session_id`** 这一条（前端就是靠 `document.cookie` 里有没有它来判断登录态的），
+`csrf_token` 负责 POST/PUT 请求的校验头。其余 `cna`、`acw_tc` 之类是埋点/防护用的，可有可无。
+
+**推荐做法（整段复制，最不容易出错）**
+
+1. 浏览器登录 <https://www.modelscope.cn>，按 `F12` 打开开发者工具
+2. 切到 **Network（网络）** 面板，刷新一下页面
+3. 点任意一条 `www.modelscope.cn` 的请求 → **Headers** → 找 `Request Headers` 里的 **`Cookie:`**
+4. 复制冒号后面**整行**，形如：
+
+   ```
+   m_session_id=xxxxx%3D%3D; csrf_token=yyyy%3D; cna=zzzz; ...
+   ```
+
+5. 一整串粘进 `MODELSCOPE_COOKIE`，不要加引号
+
+**只填一条也行**
+
+```
+m_session_id=xxxxx%3D%3D
+```
+
+⚠️ 注意 `m_session_id` 的值是 **URL 编码的**（里面有 `%3D`、`%2B` 这类字符），必须原样保留。
+所以别从 **Application（应用）→ Cookies** 面板手抄单条值——那里显示的是解码后的样子，粘回去容易失效。
+要用单条的话，在 Console 里执行 `document.cookie` 复制，或者在 Network 面板里整段复制后只保留这一条。
+
+**验证有没有效**
+
+```bash
+cd modelscope-daily-credits
+MODELSCOPE_COOKIE='m_session_id=xxxxx' npm run login-only
+```
+
+日志里出现 `Cookie 登录成功，用户：xxx` 就算对了。失败会报 `COOKIE_INVALID`（过期了，重新复制一次换掉 Secret 即可）。
 
 #### 怎么拿 Telegram 的两个值
 
 1. Telegram 里搜 **@BotFather** → 发 `/newbot` → 起个名字 → 拿到
-   `123456789:AAExxxxxxxxxxxxxxxxxxxxxxxx` 这样的 token，填进 `TELEGRAM_BOT_TOKEN`
+   `123456789:AAExxxxxxxxxxxxxxxxxxxxxxxx` 这样的 token，填进 `TG_BOT_TOKEN`
 2. 拿 chat id：
-   - **推给自己**：搜 **@userinfobot** 发消息，它回你的数字 id，填进 `TELEGRAM_CHAT_ID`
+   - **推给自己**：搜 **@userinfobot** 发消息，它回你的数字 id，填进 `TG_CHAT_ID`
    - **推到群**：把机器人拉进群，然后浏览器访问
      `https://api.telegram.org/bot<你的token>/getUpdates`，找 `"chat":{"id":-100xxxxxxxxx`，
      这一串负数就是群 id（记得先在群里随便发一句，`getUpdates` 才有数据）
@@ -117,8 +154,8 @@ npm run smoke             # 只检查登录页表单选择器是否还有效（�
 | `WAIT_SECONDS` | `10` | 登录成功后等待多少秒再刷新（你要的 10 秒） |
 | `HEADLESS` | `true` | 是否无头运行，本地调试设 `false` |
 | `LOGIN_TIMEOUT_SECONDS` | `90` | 等待登录态生效的最长时间 |
-| `TELEGRAM_BOT_TOKEN` | - | 机器人 token，和下一个一起填了才推送 |
-| `TELEGRAM_CHAT_ID` | - | 接收消息的 chat id |
+| `TG_BOT_TOKEN` | - | 机器人 token，和下一个一起填了才推送 |
+| `TG_CHAT_ID` | - | 接收消息的 chat id |
 | `TELEGRAM_API_BASE` | `https://api.telegram.org` | 走反代时改成自己的地址 |
 
 ---
