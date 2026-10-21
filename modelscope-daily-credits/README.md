@@ -157,6 +157,46 @@ npm run smoke             # 只检查登录页表单选择器是否还有效（�
 | `TG_BOT_TOKEN` | - | 机器人 token，和下一个一起填了才推送 |
 | `TG_CHAT_ID` | - | 接收消息的 chat id |
 | `TELEGRAM_API_BASE` | `https://api.telegram.org` | 走反代时改成自己的地址 |
+| `PROXY_HTTP` | - | 由工作流自动写入，形如 `http://127.0.0.1:1081`，浏览器走它 |
+| `PROXY_SERVER` | - | 由代理脚本自动写入，socks5 入口，作为 `PROXY_HTTP` 的备选 |
+
+---
+
+## 走代理（可选）
+
+GitHub 的 runner 是美国 IP，魔搭的阿里 passport 风控对境外 IP 更敏感，容易被滑块拦住。
+如果你有自己的节点，可以让浏览器走代理。
+
+### 配置
+
+1. 仓库 Secrets 里加一条 `NODE_LINK`，值是节点分享链接，支持 `vless://`、`vmess://`、
+   `trojan://`、`hysteria2://`、`anytls://`、`socks5://` 这几种
+2. 别的什么都不用改，工作流会自动装 sing-box 并接管浏览器的出网
+
+### 它是怎么串起来的
+
+`setup_proxy.sh` 做完这些事：
+
+- 起 sing-box，本地开两个入站：**socks5 `127.0.0.1:1080`** 和 **http `127.0.0.1:1081`**
+- 用 `curl -x socks5://127.0.0.1:1080 https://api.ipify.org` 自测，通了才继续
+- 往 `$GITHUB_ENV` 写 `IS_PROXY=true` 和 `PROXY_SERVER=socks5://127.0.0.1:1080`
+
+⚠️ 关键点：**它只写这两个变量，不会设置 `http_proxy` / `https_proxy`**。
+所以工作流里多了一步，读回 `PROXY_SERVER`，再验一次 http 入站，通过后产出 `PROXY_HTTP`。
+`src/index.js` 启动 Chromium 时读 `PROXY_HTTP` → `PROXY_SERVER` 的顺序，作为 Playwright 的
+`proxy.server` 传进去（浏览器和 `context.request` 都会走它）。
+
+没有代理时会自动降级为直连，不会因为代理挂了导致任务失败。
+
+### 常见坑
+
+| 现象 | 原因 |
+| --- | --- |
+| 加了代理步骤，日志一切正常但 IP 没变 | 脚本只写 `PROXY_SERVER`，Chromium 不认这个变量，必须在 `chromium.launch()` 里显式传 `proxy` |
+| 代理步骤显示绿色但没生效 | `continue-on-error: true` 会让脚本失败也变绿灯，现在脚本内部会打 `::warning::` 提示 |
+| `NODE_LINK` 填了却直连 | 节点连不上，脚本 3 次重试后 exit 1，被 `continue-on-error` 吞掉，日志里会有 `[ERROR] 代理连接失败` |
+| TG 通知不走代理 | Node 的 `fetch` 不读这些环境变量（Node 20 没有内置代理支持）。不过 runner 在境外，直连 Telegram 没问题 |
+
 
 ---
 
