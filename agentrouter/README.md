@@ -25,27 +25,13 @@
 
 | Secret 名称 | 值 | 说明 |
 |------------|-----|------|
+| `AGENTROUTER_USERNAME` | `你的邮箱或用户名` | 登录账号，邮箱或 `github_<ID>`（单用户模式 **必需**） |
+| `AGENTROUTER_PASSWORD` | `你的登录密码` | 登录密码（单用户模式 **必需**） |
+| `AGENTROUTER_ACCOUNTS` | `user1:pass1,user2:pass2` | 多账号列表，**替代**单用户模式 |
 | `TG_BOT_TOKEN` | `123456:ABC-DEF...` | Telegram Bot Token（可选） |
 | `TG_CHAT_ID` | `123456789` | Telegram Chat ID（可选） |
 
-### Variables（非敏感信息）
-
-在 **Settings → Secrets → Variables** 中添加：
-
-#### 单用户模式（二选一）
-
-| Variable 名称 | 值 | 说明 |
-|--------------|-----|------|
-| `AGENTROUTER_USERNAME` | `你的邮箱或用户名` | 登录账号，邮箱或 `github_<ID>`（**必需**） |
-| `AGENTROUTER_PASSWORD` | `你的登录密码` | 登录密码（**必需**） |
-
 > 单用户为原有模式，行为不变：签到后发送一条独立的 TG 通知。
-
-#### 多用户模式（二选一）
-
-| Variable 名称 | 值 | 说明 |
-|--------------|-----|------|
-| `AGENTROUTER_ACCOUNTS` | `user1:pass1,user2:pass2` | 多账号列表（**替代**单用户模式） |
 
 `AGENTROUTER_ACCOUNTS` 格式说明：
 - 每个条目：`用户名:密码`
@@ -57,7 +43,11 @@
   test@example.com:pass456,admin2:pass789
   ```
 
-#### 通用变量（两种模式都需要）
+### Variables（非敏感信息）
+
+在 **Settings → Secrets → Variables** 中添加：
+
+#### 通用变量
 
 | Variable 名称 | 值 | 说明 |
 |--------------|-----|------|
@@ -79,7 +69,7 @@
 
 ### 已包含的 Action
 
-`.github/workflows/agentrouter-checkin.yml` 中包含了所有变量传递。单用户使用者无需修改工作流；多用户使用者在 GitHub 仓库 Variables 中新增 `AGENTROUTER_ACCOUNTS` 即可。
+`.github/workflows/agentrouter-checkin.yml` 中包含了所有变量传递。单用户使用者无需修改工作流；多用户使用者在 GitHub 仓库 Secrets 中新增 `AGENTROUTER_ACCOUNTS` 即可。
 
 ---
 

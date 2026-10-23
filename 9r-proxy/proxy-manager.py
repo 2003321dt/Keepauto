@@ -2,7 +2,7 @@
 """
 9router 代理池同步脚本（GitHub Actions 专用）
 
-读取 socks5.txt（tg-fetch.py 产物），同步到 9router：
+读取 socks5.txt（fetch-nodes.py 产物），同步到 9router：
 1. 用 R9_PASSWORD 登录，获取 auth_token（每次运行都重新登录，不复用 cookie）
 2. 获取现有代理池，以 ip:port（name）为去重键
 3. 只增不减：新增 socks5.txt 中不存在的节点
@@ -28,10 +28,10 @@ from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
-BASE_URL = os.getenv("R9_BASE_URL") or "https://9rou.argo.indevs.in"
+BASE_URL = os.getenv("R9_BASE_URL") or ""
 PASSWORD = os.getenv("R9_PASSWORD") or ""
 OUTPUT_FILE = "socks5-otc.txt"       # 最终可用节点输出
-NODES_FILE = "socks5.txt"            # tg-fetch.py 产物
+NODES_FILE = "socks5.txt"            # fetch-nodes.py 产物
 TYPE_ALLOWED = {"socks5", "http"}    # 只处理这些类型
 
 # 并行测试配置
@@ -165,7 +165,7 @@ def is_type_allowed(pool_type: str) -> bool:
 def read_nodes_file() -> list:
     """读取 socks5.txt，返回解析后的节点 dict 列表"""
     if not os.path.exists(NODES_FILE):
-        log.error("未找到 %s，请先运行 tg-fetch.py", NODES_FILE)
+        log.error("未找到 %s，请先运行 fetch-nodes.py", NODES_FILE)
         sys.exit(1)
     nodes = []
     with open(NODES_FILE, "r", encoding="utf-8") as f:
@@ -198,7 +198,7 @@ def main():
 
     stats = {"fetched": 0, "added": 0, "deleted": 0, "total": 0, "fail_added": 0, "anomaly": False}
 
-    # 1. 读取 TG 节点
+    # 1. 读取节点（fetch-nodes.py 产物）
     new_nodes = read_nodes_file()
     stats["fetched"] = len(new_nodes)
     log.info("读取 %s: %d 个节点", NODES_FILE, len(new_nodes))
@@ -304,7 +304,8 @@ def main():
 
     # 6. 输出最终可用节点到 socks5-otc.txt（覆盖写）
     stats["total"] = len(live_pools)
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    # newline="\n" 固定 LF，避免 Windows 下写出 CRLF 污染仓库
+    with open(OUTPUT_FILE, "w", encoding="utf-8", newline="\n") as f:
         for p in live_pools:
             f.write(p.get("proxyUrl", "") + "\n")
     log.info("最终可用节点 %d 个，已写入 %s", stats["total"], OUTPUT_FILE)
@@ -335,9 +336,9 @@ def send_tg_notification(stats: dict):
         message = (
             f"⚠️ <b>9Router 代理池异常保护</b>\n"
             f"----------------\n"
-            f"📅 <b>同步日期</b>：{date_str}\n"
-            f"📥 <b>节点抓取</b>：{stats['fetched']} 个节点\n"
-            f"🚫 <b>检测异常</b>：不通比例超过 90%\n"
+            f"📅 <b>日期</b>：{date_str}\n"
+            f"📥 <b>节点文件</b>：{stats['fetched']} 个节点\n"
+            f"🚫 <b>检测到系统性异常</b>：不通比例超过 90%\n"
             f"🛡️ <b>已跳过删除</b>，代理池保持原状\n"
             f"📄 <b>socks5-otc.txt</b> 未更新"
         )
@@ -345,10 +346,10 @@ def send_tg_notification(stats: dict):
         message = (
             f"🎉 <b>9Router 代理池更新</b>\n"
             f"----------------\n"
-            f"📅 <b>同步日期</b>：{date_str}\n"
-            f"📥 <b>节点抓取</b>：{stats['fetched']} 个节点\n"
-            f"➕ <b>新增节点</b>：{stats['added']} 个\n"
-            f"❌ <b>删除节点</b>：{stats['deleted']} 个（测试不通）\n"
+            f"📅 <b>日期</b>：{date_str}\n"
+            f"📥 <b>节点文件</b>：{stats['fetched']} 个节点\n"
+            f"➕ <b>新增</b>：{stats['added']} 个\n"
+            f"❌ <b>删除</b>：{stats['deleted']} 个（测试不通）\n"
             f"✅ <b>最终可用</b>：{stats['total']} 个\n"
             f"📄 <b>socks5-otc.txt</b> 已更新"
         )
